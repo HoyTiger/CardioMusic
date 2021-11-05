@@ -5,6 +5,7 @@
 ## Music Inference
 
 We predict ten music clips from test set using the music branch. The ground truth and predict label are plotted in the following figure.
+
 ![img_1.png](img_1.png)
 
 we can see that the music brance of CardioMusic is effective.
