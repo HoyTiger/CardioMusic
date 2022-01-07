@@ -2,7 +2,7 @@
 # Detail Result
 
 ## Comparison with baseline
-Since there is few researches about calculating the similarity between ECG and music, we choose the baselines from matching image and music task. $L^3\ Net$ [1] and $ACPNet$ [2] extract features for image and music, fuse the extracted features and pass through several FC layers to classify whether music and image are similarity. We replace the image subnetwork of them with ECG subnetwork and replace the cross-entropy loss with MSE loss. 
+Since there is few researches about calculating the similarity between ECG and music, we choose the baselines from matching image and music task. $L^3 Net$ [1] and $ACPNet$ [2] extract features for image and music, fuse the extracted features and pass through several FC layers to classify whether music and image are similarity. We replace the image subnetwork of them with ECG subnetwork and replace the cross-entropy loss with MSE loss. 
 The following two figures are the structures of two model. The dataset of each model is different.  $L^3Net$ uses log-spectrograms as input to ECG branch in origin.  We train each model on our own dataset.
 
 ![img](./img_2.png)
