@@ -37,7 +37,7 @@ the results of  modified CardioMusic are shown in the table.
 |     | Similarity  MSE | ECG VA MSE | Music VA MSE|
 |  ----  |----|  ----  | ----  |
 |  CardioMusic| 0.0086 | 0.0113| 0.0002 |
-| CardioMusic w/o VA  | 0.0287 | --| --|
+| CardioMusic w/o VA  | 0.0183 | --| --|
 | CardioMusic w/o S| 0.0101|0.0121 |0.00005 |
 
 The CardioMusic w/o S gets the better Music VA MSE (5*10^-5) and close ECG VA MSE (0.0121) to CardioMusic, while the CardioMusic gets the best similarity MSE (0.0086) even better than calculated by VA predictors from CardioMusic w/o S (0.0101).
