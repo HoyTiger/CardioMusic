@@ -12,8 +12,8 @@ the Similarity MSEs of each model is shown in the following table.
 
 |     | Similarity  MSE |
 |  ----  | ----  |
-|  $L^3-Net$ | 0.0243 |
-|  $ACP-Net$  | 0.0287 |
+|   $L^3-Net$ | 0.0243 |
+|   $ACP-Net$  | 0.0287 |
 | CardioMusic | 0.0086|
 
 
