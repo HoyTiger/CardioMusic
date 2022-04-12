@@ -236,29 +236,7 @@ def get_feelings(filename):
     df.rename(columns={' valence_mean': 'valence'}, inplace=True)
     df.rename(columns={' arousal_mean': 'arousal'}, inplace=True)
 
-    # # pdb.set_trace()
-    #
-    # def feeling_map(s):
-    #     """Refer: https://stackoverflow.com/questions/49586471/add-new-column-to-python-pandas-dataframe-based-on-multiple-conditions
-    #     open to new ideas for this
-    #     Feelings:
-    #     "Happy", # Valence > 0 and Arousal >0
-    #     "Calm",   # Valence > 0 and Arousal < 0
-    #     "Angry",  # Valence <0 and Arousal > 0
-    #     "Sad",  # Valence < 0 and Arousal < 0
-    #     ]
-    #     """
-    #     if s['valence'] >= 5 and s['arousal'] >= 5:
-    #         return 0
-    #     elif s['valence'] >= 5 and s['arousal'] < 5:
-    #         return 1
-    #     elif s['valence'] < 5 and s['arousal'] >= 5:
-    #         return 2
-    #     elif s['valence'] < 5 and s['arousal'] < 5:
-    #         return 3
-    #
-    # # Add a new column
-    # df["Feeling"] = df.apply(feeling_map, axis=1)
+
 
     return df
 
@@ -339,7 +317,7 @@ class DEAMDataset(Dataset):
 
 
 class MyDataset(Dataset):
-    def __init__(self, ecg_data, ecg_label, music_data, music_label, mean = 0.46829593):
+    def __init__(self, ecg_data, ecg_label, music_data, music_label, mean = 0.46829593, test=False):
         self.ecg_data = ecg_data
         self.ecg_label = ecg_label
         self.music_data = music_data
@@ -347,17 +325,29 @@ class MyDataset(Dataset):
         self.mean = mean
         self.distances = pairwise_distances(ecg_label.reshape(-1, 2), music_label.reshape((-1, 2)))
         self.similarity = np.exp(-self.distances / self.mean)
+        self.is_test = test
 
 
     def __len__(self):
+        if self.is_test:
+            return len(self.ecg_data)*len(self.music_data)
         return len(self.ecg_data)
 
     def __getitem__(self, item):
+        if self.is_test:
+            i = item // len(self.music_data)
+            j = item % len(self.music_data)
+            ecg = self.ecg_data[i]
+            ecg_label = self.ecg_label[i].reshape((2))
+
+            music = self.music_data[j]
+            music_label = self.music_label[j].reshape((-1, 2))
+
+            distance = self.similarity[i][j]
+            return ecg, ecg_label.reshape((2)), music, music_label.reshape((2)), distance.reshape((1))
+
         ecg = self.ecg_data[item]
         ecg_label = self.ecg_label[item].reshape((2))
-
-        # same_index = np.where(pairwise_distances(self.music_label, ecg_label) < 0.3)[0]
-        # print(len(same_index))
 
         music_index = np.random.randint(0, len(self.music_label))
         music = self.music_data[music_index]
@@ -366,45 +356,3 @@ class MyDataset(Dataset):
         distance = self.similarity[item][music_index]
 
         return ecg, ecg_label.reshape((2)), music, music_label.reshape((2)), distance.reshape((1))
-
-
-class MyTripletDataset(Dataset):
-    def __init__(self, ecg_data, ecg_label, music_data, music_label, th=0.1):
-        self.ecg_data = ecg_data
-        self.ecg_label = ecg_label
-        self.music_data = music_data
-        self.music_label = music_label
-        self.th = th
-        self.distances = pairwise_distances(ecg_label.reshape(-1, 2), music_label.reshape((-1, 2)))
-        self.mean = 0.46829593
-        self.similarity = np.exp(-self.distances / self.mean)
-
-    def __len__(self):
-        return len(self.ecg_data)
-
-    def __getitem__(self, item):
-        ecg_index = item
-        music_index = np.random.choice(len(self.music_data))
-
-        # another_index = np.random.choice(len(self.music_data))
-
-        another_music_index = np.random.choice(len(self.music_data))
-        another_ecg_index = np.random.choice(len(self.ecg_data))
-        while another_music_index == music_index and another_ecg_index == ecg_index:
-            another_music_index = np.random.choice(len(self.music_data))
-            another_ecg_index = np.random.choice(len(self.ecg_data))
-
-        ecg = self.ecg_data[ecg_index]
-        ecg_label = self.ecg_label[ecg_index].reshape((-1, 2))
-        music = self.music_data[music_index]
-        music_label = self.music_label[music_index]
-
-        an_ecg = self.ecg_data[another_ecg_index]
-        an_ecg_label = self.ecg_label[another_ecg_index].reshape((-1, 2))
-        an_music = self.music_data[another_music_index]
-        an_music_label = self.music_label[another_music_index]
-
-        return ecg, ecg_label.reshape((2)), music, music_label.reshape((2)), an_ecg, an_ecg_label.reshape((2)), an_music, an_music_label.reshape((2)), \
-               self.similarity[ecg_index][music_index] + 0.00001, self.similarity[ecg_index][another_music_index] + 0.00001, \
-               self.similarity[another_ecg_index][music_index] + 0.00001
-

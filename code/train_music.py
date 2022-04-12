@@ -4,9 +4,9 @@ from dataset import *
 from model.resnet1d import *
 
 
-epochs = 100
+epochs = 5
 device = 'cuda:2' if torch.cuda.is_available() else 'cpu'
-lr = 1e-2
+lr = 1e-5
 
 ecg_dataset = DEAM()
 
@@ -74,6 +74,6 @@ for epoch in range(0, epochs):
             es = 0
         else:
             es += 1
-        if es > 20:
+        if es > 10:
             break
 

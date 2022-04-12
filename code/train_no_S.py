@@ -1,3 +1,7 @@
+from datetime import datetime
+
+from torch.utils.tensorboard import SummaryWriter
+
 from models import *
 import torch
 
@@ -23,8 +27,7 @@ if __name__ == '__main__':
     test_data_loader = DataLoader(test_dataset, batch_size=64, shuffle=True)
 
     model = DMLNet(pretrain=True).to(device)
-    # model.load_state_dict(torch.load('model_pretrain.pth', map_location=device))
-    # print(model)
+
 
     opt = torch.optim.SGD(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, mode='min', factor=0.1, patience=5, verbose=True,
@@ -79,16 +82,7 @@ if __name__ == '__main__':
                     loss3,
                     epoch * len(train_data_loader) + i
                 )
-                # writer.add_scalar(
-                #     "cfr loss",
-                #     loss4,
-                #     epoch * len(train_data_loader) + i
-                # )
-                # writer.add_scalar(
-                #     "cfm loss",
-                #     loss5,
-                #     epoch * len(train_data_loader) + i
-                # )
+
 
         with torch.no_grad():
             model.eval()
@@ -169,7 +163,8 @@ if __name__ == '__main__':
 
             if loss2 + loss3 < best_loss:
                 best_loss = loss2 + loss3
-                torch.save(model.state_dict(), 'model_no_s.pth')
+                torch.save(model.state_dict(), 'freeze_model/model_no_s.pth')
+                es = es//2
             else:
                 es += 1
             if es > 10:

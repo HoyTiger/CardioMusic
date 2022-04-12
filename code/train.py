@@ -1,3 +1,7 @@
+from datetime import datetime
+
+from torch.utils.tensorboard import SummaryWriter
+
 from models import *
 import torch
 
@@ -16,17 +20,17 @@ if __name__ == '__main__':
     music_dataset = DEAM()
     ecg_dataset = DREAMER()
 
-    train_dataset = MyDataset(ecg_dataset.Xtrain, ecg_dataset.ytrain, music_dataset.Xtrain, music_dataset.ytrain)
+    train_dataset = MyDataset(ecg_dataset.Xtrain, ecg_dataset.ytrain, music_dataset.data, music_dataset.label)
     train_data_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
 
-    test_dataset = MyDataset(ecg_dataset.Xtest, ecg_dataset.ytest, music_dataset.Xtest, music_dataset.ytest)
-    test_data_loader = DataLoader(test_dataset, batch_size=64, shuffle=True)
+    test_dataset = MyDataset(ecg_dataset.Xtest, ecg_dataset.ytest, music_dataset.data, music_dataset.label)
+    test_data_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
     model = DMLNet(pretrain=True).to(device)
     # model.load_state_dict(torch.load('model_pretrain.pth', map_location=device))
     # print(model)
 
-    opt = torch.optim.SGD(model.parameters(), lr=lr)
+    opt = torch.optim.Adam(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, mode='min', factor=0.1, patience=5, verbose=True,
                                                            threshold=0.005, threshold_mode='rel', cooldown=0, min_lr=0,
                                                            eps=1e-08)
@@ -78,16 +82,7 @@ if __name__ == '__main__':
                     loss3,
                     epoch * len(train_data_loader) + i
                 )
-                # writer.add_scalar(
-                #     "cfr loss",
-                #     loss4,
-                #     epoch * len(train_data_loader) + i
-                # )
-                # writer.add_scalar(
-                #     "cfm loss",
-                #     loss5,
-                #     epoch * len(train_data_loader) + i
-                # )
+
 
         with torch.no_grad():
             model.eval()
@@ -127,11 +122,7 @@ if __name__ == '__main__':
                     loss2,
                     epoch * len(test_data_loader) + i
                 )
-                # writer.add_scalar(
-                #     "test music loss a",
-                #     loss4,
-                #     epoch * len(test_data_loader) + i
-                # )
+
 
                 writer.add_scalar(
                     "test similarity loss",
@@ -160,37 +151,13 @@ if __name__ == '__main__':
             loss1 = torch.nn.MSELoss()(predeict, sim_label)
             loss2 = torch.nn.MSELoss()(ecg_outputs, ecg_labels)
             loss3 = torch.nn.MSELoss()(music_outputs, music_labels)
-            scheduler.step(loss2 + loss3)
+            scheduler.step(loss2 + loss3 + loss)
 
             print(f"Test\tepoch: {epoch}, loss smi:{loss}, loss me:{loss1}, ecg loss: {loss2}, music loss:{loss3}")
-
-            # print(loss.item(), loss1.item(), loss2.item(), loss3.item())
-
-            # writer.add_scalar(
-            #     "test cfr loss",
-            #     loss4,
-            #     epoch * len(test_data_loader) + i
-            # )
-            # writer.add_scalar(
-            #     "test cfm loss",
-            #     loss5,
-            #     epoch * len(test_data_loader) + i
-            # )
-
-            #     if test_output is None and test_label is None:
-            #         test_output = output
-            #         test_label = label
-            #     else:
-            #         test_output = torch.cat([test_output, output], dim=0)
-            #         test_label = torch.cat([test_label, label], dim=0)
-            #
-            # loss = cost(test_output, test_label)
-            # acc = (test_output.argmax(1) == test_label).float().mean()
-            # print(classification_report(test_label.cpu(), test_output.cpu().argmax(1)))
-
-            if loss2 + loss3 < best_loss:
-                best_loss = loss2 + loss3
-                torch.save(model.state_dict(), 'model_final.pth')
+            if loss + loss2 + loss3 < best_loss:
+                best_loss = loss2 + loss3 + loss
+                torch.save(model.state_dict(), 'freeze_model/model_final.pth')
+                es = es//2
             else:
                 es += 1
             if es > 10:

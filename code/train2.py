@@ -1,33 +1,36 @@
 from datetime import datetime
-import torch
+
 from torch.utils.tensorboard import SummaryWriter
+
 from models import *
-from dataset import *
 import torch
 
+from dataset import *
+from models import *
 
 if __name__ == '__main__':
 
     # default 'log_dir' is
     writer = SummaryWriter("runs/{0:%Y-%m-%dT%H-%M-%S/}".format(datetime.now()))
 
-    device = 'cuda:3' if torch.cuda.is_available() else 'cpu'
+    device = 'cuda:5' if torch.cuda.is_available() else 'cpu'
     lr = 1e-3
     epochs = 200
 
     music_dataset = DEAM()
     ecg_dataset = DREAMER()
 
-    train_dataset = MyDataset(ecg_dataset.Xtrain, ecg_dataset.ytrain, music_dataset.Xtrain, music_dataset.ytrain)
+    train_dataset = MyDataset(ecg_dataset.Xtrain, ecg_dataset.ytrain, music_dataset.data, music_dataset.label)
     train_data_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
 
-    test_dataset = MyDataset(ecg_dataset.Xtest, ecg_dataset.ytest, music_dataset.Xtest, music_dataset.ytest)
-    test_data_loader = DataLoader(test_dataset, batch_size=64, shuffle=True)
+    test_dataset = MyDataset(ecg_dataset.Xtest, ecg_dataset.ytest, music_dataset.data, music_dataset.label)
+    test_data_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
-    model = DMLNet(pretrain=False).to(device)
-    model.load_state_dict(torch.load('model6.pth'))
+    model = DMLNet(pretrain=True).to(device)
+    # model.load_state_dict(torch.load('model_pretrain.pth', map_location=device))
+    # print(model)
 
-    opt = torch.optim.SGD(model.parameters(), lr=lr)
+    opt = torch.optim.Adam(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, mode='min', factor=0.1, patience=5, verbose=True,
                                                            threshold=0.005, threshold_mode='rel', cooldown=0, min_lr=0,
                                                            eps=1e-08)
@@ -40,16 +43,16 @@ if __name__ == '__main__':
     for epoch in range(0, epochs):
         model.train()
         for i, (ecg, ecg_label, music, music_label, distance) in enumerate(train_data_loader):
-            ecg, ecg_label, music, music_label, distance = ecg.to(device), ecg_label.to(device), music.to(device), music_label.to(device), distance.to(device)
+            ecg, ecg_label, music, music_label, distance = ecg.to(device), ecg_label.to(device), music.to(
+                device), music_label.to(device), distance.to(device)
             opt.zero_grad()
-            loss, loss1, loss2, loss3, _, _, _= model(ecg, ecg_label, music, music_label, distance)
-            loss.backward()
+            loss, loss1, loss2, loss3, _, _, _ = model(ecg, ecg_label, music, music_label, distance)
+            loss3.backward()
             opt.step()
 
             if i % 10 == 0:
                 print(
-                    f"epoch: {epoch}, batch: {i}, loss:{loss}, ecg loss:{loss1}, music loss: {loss2}, loss smi:{loss3}"
-                    f"")
+                    f"epoch: {epoch}, batch: {i}, loss:{loss}, ecg loss:{loss1}, music loss: {loss2}, sim loss:{loss3}")
                 writer.add_scalar(
                     "ecg loss",
                     loss1,
@@ -79,16 +82,7 @@ if __name__ == '__main__':
                     loss3,
                     epoch * len(train_data_loader) + i
                 )
-                # writer.add_scalar(
-                #     "cfr loss",
-                #     loss4,
-                #     epoch * len(train_data_loader) + i
-                # )
-                # writer.add_scalar(
-                #     "cfm loss",
-                #     loss5,
-                #     epoch * len(train_data_loader) + i
-                # )
+
 
         with torch.no_grad():
             model.eval()
@@ -104,10 +98,10 @@ if __name__ == '__main__':
                     device), music_label.to(device), distance.to(device)
 
                 loss, loss1, loss2, loss3, ecg_out, music_out, predict_distance = model(ecg,
-                                                                                                      ecg_label,
-                                                                                                      music,
-                                                                                                      music_label,
-                                                                                                      distance)
+                                                               ecg_label,
+                                                               music,
+                                                               music_label,
+                                                               distance)
                 writer.add_scalar(
                     "test loss",
                     loss,
@@ -128,11 +122,7 @@ if __name__ == '__main__':
                     loss2,
                     epoch * len(test_data_loader) + i
                 )
-                # writer.add_scalar(
-                #     "test music loss a",
-                #     loss4,
-                #     epoch * len(test_data_loader) + i
-                # )
+
 
                 writer.add_scalar(
                     "test similarity loss",
@@ -155,43 +145,20 @@ if __name__ == '__main__':
                     sim_label = torch.cat([sim_label, distance], dim=0)
                     sim_outputs = torch.cat([sim_outputs, predict_distance], dim=0)
 
-            predeict = torch.exp(-torch.sum((music_outputs - ecg_outputs).pow(2), dim=1).sqrt() / test_dataset.mean).reshape((-1, 1))
+            predeict = torch.exp(
+                -torch.sum((music_outputs - ecg_outputs).pow(2), dim=1).sqrt() / test_dataset.mean).reshape((-1, 1))
             loss = torch.nn.MSELoss()(sim_outputs, sim_label)
             loss1 = torch.nn.MSELoss()(predeict, sim_label)
             loss2 = torch.nn.MSELoss()(ecg_outputs, ecg_labels)
             loss3 = torch.nn.MSELoss()(music_outputs, music_labels)
-            scheduler.step(loss + loss2 + loss3)
+            scheduler.step(loss2)
 
-            print(f"Test\tepoch: {epoch}, loss sim:{loss}, loss me:{loss1}, ecg loss: {loss2}, music loss:{loss3}")
-
-            # print(loss.item(), loss1.item(), loss2.item(), loss3.item())
-
-                # writer.add_scalar(
-                #     "test cfr loss",
-                #     loss4,
-                #     epoch * len(test_data_loader) + i
-                # )
-                # writer.add_scalar(
-                #     "test cfm loss",
-                #     loss5,
-                #     epoch * len(test_data_loader) + i
-                # )
-
-                #     if test_output is None and test_label is None:
-                #         test_output = output
-                #         test_label = label
-                #     else:
-                #         test_output = torch.cat([test_output, output], dim=0)
-                #         test_label = torch.cat([test_label, label], dim=0)
-                #
-                # loss = cost(test_output, test_label)
-                # acc = (test_output.argmax(1) == test_label).float().mean()
-                # print(classification_report(test_label.cpu(), test_output.cpu().argmax(1)))
-
-            if loss + loss2 + loss3 < best_loss:
-                best_loss = loss + loss2 + loss3
-                torch.save(model.state_dict(), 'model5.pth')
+            print(f"Test\tepoch: {epoch}, loss smi:{loss}, loss me:{loss1}, ecg loss: {loss2}, music loss:{loss3}")
+            if loss < best_loss:
+                best_loss = loss
+                torch.save(model.state_dict(), 'freeze_model/model_final_WO_VA.pth')
+                es = es//2
             else:
                 es += 1
-            if es > 20:
+            if es > 10:
                 break
